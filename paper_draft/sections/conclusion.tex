@@ -1,0 +1,8 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We studied whether prompt-only frontier LLMs can recommend music from listening history or playlist context without any task-specific training. Using a shared closed-set ranking protocol on \lastfm and \mpd, we found that both \gptfourone and \claudesonnet outperform lightweight classical baselines by large margins. The best system, \gptfourone with a minimal context prompt, reaches 0.589 \mrr on \lastfm and 0.329 \mrr on \mpd, well above the strongest implemented baseline.
+
+The key takeaway is simple: prompt-only LLM recommendation can work surprisingly well against lightweight public baselines, especially when the task is framed as reranking a fixed candidate pool from recent context. The richer profile prompt does not help, and the two frontier models are statistically tied in the strongest setting.
+
+The main next steps are clear. Future work should compare against stronger public baselines such as SASRec, PureSVD, or RecBole models; separate candidate generation from LLM reranking; evaluate real personal Spotify exports; and add human judgments of novelty, usefulness, and playlist fit. Those steps are needed before making any stronger claim about performance relative to production music recommenders.

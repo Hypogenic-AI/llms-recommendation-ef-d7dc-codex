@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "stages": {
+    "resource_finder": {
+      "success": true,
+      "completion_marker": "/workspaces/llms-recommendation-ef-d7dc-codex/.resource_finder_complete",
+      "outputs": {
+        "literature_review": "/workspaces/llms-recommendation-ef-d7dc-codex/literature_review.md",
+        "resources_catalog": "/workspaces/llms-recommendation-ef-d7dc-codex/resources.md",
+        "papers_dir": "/workspaces/llms-recommendation-ef-d7dc-codex/papers",
+        "datasets_dir": "/workspaces/llms-recommendation-ef-d7dc-codex/datasets",
+        "code_dir": "/workspaces/llms-recommendation-ef-d7dc-codex/code"
+      },
+      "log_file": "/workspaces/llms-recommendation-ef-d7dc-codex/logs/resource_finder_codex.log",
+      "transcript_file": "/workspaces/llms-recommendation-ef-d7dc-codex/logs/resource_finder_codex_transcript.jsonl",
+      "elapsed_time": 529.6086678504944
+    },
+    "experiment_runner": {
+      "success": true,
+      "return_code": 0,
+      "elapsed_time": 1960.9555990695953,
+      "log_file": "/workspaces/llms-recommendation-ef-d7dc-codex/logs/execution_codex.log",
+      "transcript_file": "/workspaces/llms-recommendation-ef-d7dc-codex/logs/execution_codex_transcript.jsonl"
+    }
+  },
+  "work_dir": "/workspaces/llms-recommendation-ef-d7dc-codex"
+}

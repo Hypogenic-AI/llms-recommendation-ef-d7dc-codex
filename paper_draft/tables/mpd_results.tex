@@ -1,0 +1,19 @@
+\begin{table}[t]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}lcccc@{}}
+        \toprule
+        \textbf{Method} & \textbf{MRR} & \textbf{NDCG@10} & \textbf{Hit@10} & \textbf{Mean Top-10 Popularity Pct} \\
+        \midrule
+        Popularity & 0.067 & 0.036 & 0.100 & 0.0012 \\
+        Cooccurrence & 0.094 & 0.061 & 0.120 & 0.0494 \\
+        \gptfourone (\minimalprompt) & {\bf 0.329} & {\bf 0.379} & 0.640 & {\bf 0.0832} \\
+        \gptfourone (\profileprompt) & 0.203 & 0.206 & 0.380 & 0.0710 \\
+        \claudesonnet (\minimalprompt) & 0.312 & 0.373 & {\bf 0.660} & 0.0805 \\
+        \claudesonnet (\profileprompt) & 0.244 & 0.285 & 0.540 & 0.0747 \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Results on \mpd playlist continuation. Higher is better for all metrics shown. Best results are in \textbf{bold}.}
+    \label{tab:mpd-results}
+\end{table}

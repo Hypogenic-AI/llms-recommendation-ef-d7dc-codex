@@ -1,0 +1,10 @@
+You are ranking music recommendation candidates. Use only the listening history or playlist context below.
+Return valid JSON with exactly one key named `ranked_ids` whose value is an array of candidate IDs ordered from best to worst.
+Do not include explanations.
+
+Context type: {context_type}
+Recent context:
+{history_lines}
+
+Candidates:
+{candidate_lines}

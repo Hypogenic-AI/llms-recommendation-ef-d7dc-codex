@@ -1,0 +1,775 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at .codex/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. VERIFY COMMAND TEMPLATES: Command templates (math.tex, general.tex, macros.tex) are pre-copied to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# REPORT
+
+## 1. Executive Summary
+This study tested whether a prompt-only frontier LLM can turn Spotify-style listening history into music recommendations that are as good as or better than classical recommendation algorithms. On two public offline ranking tasks, both `gpt-4.1` and `Claude Sonnet 4.5` beat the two implemented classical baselines by large margins.
+
+The best-performing setup was the simplest one: give the model only the recent listening or playlist context plus a fixed candidate set and ask it to rank the candidates. On Last.fm, `gpt-4.1` reached `MRR 0.589` and `NDCG@10 0.621` versus the strongest classical baseline at `MRR 0.282`, `NDCG@10 0.246`. On Spotify MPD, `gpt-4.1` reached `MRR 0.329`, `NDCG@10 0.379` versus `MRR 0.094`, `NDCG@10 0.061` for the strongest classical baseline. Claude was statistically tied with GPT in the same prompt setting.
+
+Practical implication: if the comparison class is a lightweight Spotify-style baseline built from listening history or playlist continuation, asking a strong LLM can work surprisingly well. But this does **not** establish that prompting Claude beats Spotify’s proprietary production recommender, because the study used public datasets, a closed candidate set, and simpler baselines than Spotify likely uses internally.
+
+## 2. Research Question &amp; Motivation
+### Question
+Can a prompt-only LLM, given exported music-listening or playlist history, generate recommendations that match or outperform classical Spotify-style recommendation baselines?
+
+### Why it matters
+The practical user question is straightforward: “If I export all my Spotify data and ask Claude for recommendations, is it better than Spotify recommendations?” This matters because LLMs offer a portable, platform-independent interface to personal data. If prompting alone works well, recommendation could become user-controlled rather than platform-controlled.
+
+### Gap filled
+The literature gathered in [literature_review.md](./literature_review.md) shows that LLMs help recommendation most often in **hybrid** systems such as A-LLMRec, LLaRA, and TALKPLAY. There is much less evidence on the narrower but practically important case of **prompt-only** recommendation from user history with no fine-tuning.
+
+## 3. Experimental Setup
+### Models tested
+- `gpt-4.1` via the OpenAI Responses API, temperature `0.0`
+- `anthropic/claude-sonnet-4.5` via OpenRouter, temperature `0.0`
+
+### Prompt conditions
+- `minimal`: recent listening history or playlist prefix plus a fixed candidate list
+- `profile`: the same prompt plus compact profile hints such as top artists and country when available
+
+Templates are in [prompts/minimal_prompt.txt](./prompts/minimal_prompt.txt) and [prompts/profile_prompt.txt](./prompts/profile_prompt.txt).
+
+### Datasets and task construction
+- `Last.fm`: the local pre-gathered subset had only `7 users`, so the experiment loaded a larger Hugging Face slice, `train[:1000000]`, yielding `56 users` and `55 eligible users`. The final evaluation used `50` held-out next-track examples.
+- `Spotify MPD`: the pre-gathered sample slice contained `1000 playlists`; the final evaluation used `50` playlist-continuation examples.
+
+For every example, the task was framed as closed-set ranking:
+- 1 true held-out track
+- 19 negative tracks
+- 20 candidates total
+
+This makes all methods solve the same problem and avoids unfair free-form generation comparisons.
+
+### Baselines
+- `popularity`: rank candidates by training frequency
+- `cooccurrence`: track co-occurrence + artist co-occurrence + small popularity term
+
+These are lightweight Spotify-style baselines, not Spotify’s internal production system.
+
+### Metrics
+- `MRR`
+- `NDCG@10`
+- `Hit@10`
+- `mean_top10_popularity_pct`
+  Interpretation: larger values mean the top-10 list is less concentrated in the global head of the catalog.
+- `coverage`
+
+### Statistical plan
+- Paired Wilcoxon signed-rank tests on per-example `MRR` and `NDCG@10`
+- Benjamini-Hochberg correction across primary comparisons within each dataset
+- Paired Cohen’s `d` on per-example differences
+- Bootstrap 95% confidence intervals for aggregate metrics
+
+### Environment and compute
+- Date of execution: `2026-05-05`
+- Python: `3.12.8`
+- Libraries: `numpy 2.4.4`, `pandas 3.0.2`, `scipy 1.17.1`, `matplotlib 3.10.9`, `seaborn 0.13.2`, `datasets 4.8.5`, `requests 2.33.1`
+- GPU availability detected: `4 x NVIDIA RTX A6000 (49 GB each)`
+- GPU usage: none; this was API-bound evaluation rather than local model training
+
+### Cost
+- OpenAI token usage: `84,195` input tokens and `23,014` output tokens
+- OpenAI estimated cost: about `$0.353`, using the official GPT-4.1 API rate of `$2.00 / 1M` input tokens and `$8.00 / 1M` output tokens from OpenAI’s pricing page (`https://openai.com/api/pricing`)
+- Claude token usage: `123,526` total tokens
+- Claude cost from returned API metadata: `$0.606`
+- Total estimated cost of the final run: about `$0.958`
+
+## 4. Results
+### Last.fm next-track ranking
+
+| Method | MRR | NDCG@10 | Hit@10 | Mean top-10 popularity pct |
+|---|---:|---:|---:|---:|
+| Popularity | 0.051 | 0.000 | 0.000 | 0.0001 |
+| Cooccurrence | 0.282 | 0.246 | 0.260 | 0.0100 |
+| GPT-4.1 minimal | **0.589** | **0.621** | 0.780 | 0.0388 |
+| GPT-4.1 profile | 0.539 | 0.581 | 0.780 | 0.0398 |
+| Claude minimal | 0.572 | 0.597 | 0.740 | 0.0361 |
+| Claude profile | 0.544 | 0.586 | 0.780 | 0.0397 |
+
+Primary tests against the strongest classical baseline (`cooccurrence`) were significant after BH correction for every LLM condition:
+- GPT-4.1 minimal vs cooccurrence: `MRR p_BH = 0.000005`, `NDCG@10 p_BH = 0.000014`
+- Claude minimal vs cooccurrence: `MRR p_BH = 0.000011`, `NDCG@10 p_BH = 0.000038`
+
+### Spotify MPD playlist continuation
+
+| Method | MRR | NDCG@10 | Hit@10 | Mean top-10 popularity pct |
+|---|---:|---:|---:|---:|
+| Popularity | 0.067 | 0.036 | 0.100 | 0.0012 |
+| Cooccurrence | 0.094 | 0.061 | 0.120 | 0.0494 |
+| GPT-4.1 minimal | **0.329** | **0.379** | 0.640 | 0.0832 |
+| GPT-4.1 profile | 0.203 | 0.206 | 0.380 | 0.0710 |
+| Claude minimal | 0.312 | 0.373 | 0.660 | 0.0805 |
+| Claude profile | 0.244 | 0.285 | 0.540 | 0.0747 |
+
+Primary tests against `cooccurrence` were again significant after BH correction for every LLM condition:
+- GPT-4.1 minimal vs cooccurrence: `MRR p_BH = 0.00000036`, `NDCG@10 p_BH = 0.0000079`
+- Claude minimal vs cooccurrence: `MRR p_BH = 0.00000036`, `NDCG@10 p_BH = 0.0000059`
+
+### Prompt ablation
+- On Last.fm, `minimal` vs `profile` was not significantly different for either model.
+- On MPD, the profile prompt was reliably worse:
+  - Claude minimal vs Claude profile: `MRR p = 0.00138`, `NDCG@10 p = 0.00990`
+  - GPT minimal vs GPT profile: `MRR p = 0.00034`, `NDCG@10 p = 0.00114`, `Hit@10 p = 0.00079`
+
+### Model comparison
+- GPT-4.1 minimal and Claude minimal were statistically tied on both datasets.
+- Example: on MPD, `MRR p = 0.963`, `NDCG@10 p = 0.891`.
+
+### Output files
+- Per-example metrics: [results/lastfm/per_example_metrics.csv](./results/lastfm/per_example_metrics.csv), [results/mpd/per_example_metrics.csv](./results/mpd/per_example_metrics.csv)
+- Summary metrics: [results/lastfm/summary_metrics.csv](./results/lastfm/summary_metrics.csv), [results/mpd/summary_metrics.csv](./results/mpd/summary_metrics.csv)
+- Significance tests: [results/lastfm/significance_tests.csv](./results/lastfm/significance_tests.csv), [results/mpd/significance_tests.csv](./results/mpd/significance_tests.csv)
+- Cached model outputs: [results/model_outputs/response_cache.jsonl](./results/model_outputs/response_cache.jsonl)
+
+### Figures
+Last.fm:
+- ![Last.fm RR](./figures/lastfm/rr_comparison.png)
+- ![Last.fm NDCG@10](./figures/lastfm/ndcg10_comparison.png)
+
+MPD:
+- ![MPD RR](./figures/mpd/rr_comparison.png)
+- ![MPD NDCG@10](./figures/mpd/ndcg10_comparison.png)
+
+## 5. Analysis &amp; Discussion
+### What the results show
+Across both tasks, prompt-only LLM ranking substantially outperformed the implemented classical baselines. The gains were large in absolute terms:
+- Last.fm: best LLM `MRR 0.589` vs `0.282` for cooccurrence
+- MPD: best LLM `MRR 0.329` vs `0.094` for cooccurrence
+
+This supports the narrow practical claim that a strong LLM can exploit recent listening context well enough to beat lightweight history-based ranking heuristics.
+
+### Why the simple prompt worked better
+The extra profile hints did not help and often hurt. The likely reason is that once the candidate list is fixed, the task benefits more from local coherence with the recent context than from broader summaries. Extra profile text may distract the model from the short-horizon continuation signal.
+
+### Popularity bias and diversity
+The LLM conditions consistently had higher `mean_top10_popularity_pct` than the classical baselines, meaning they were less concentrated in the most globally popular items. Coverage was also slightly higher for the LLMs. So the LLMs were not merely reproducing the head of the popularity distribution.
+
+### Representative successes and failures
+The strongest gains appeared when the recent context had a coherent style, artist cluster, or playlist mood that the LLM could infer semantically. Failure cases tended to involve abrupt shifts, sparse context, or targets with weak semantic cues from the prefix.
+
+## 6. Limitations
+- This is **not** a direct evaluation of Spotify’s internal recommender. The comparison is against public lightweight baselines.
+- The evaluation uses a **closed candidate set**. Open-ended recommendation is harder and may change the ranking.
+- The Last.fm experiment had to use `train[:1000000]` from the remote dataset because the local subset was too user-sparse.
+- The MPD evaluation used a single downloaded slice, not the full Spotify Million Playlist Dataset.
+- Candidate quality matters. Harder negative sampling would likely reduce all scores.
+- No human evaluation was performed, so this study measures ranking accuracy, not subjective recommendation satisfaction.
+
+## 7. Conclusions &amp; Next Steps
+Prompt-only frontier LLMs were clearly stronger than the implemented public Spotify-style baselines on both public tasks. In that limited sense, asking Claude or GPT for recommendations from exported listening history can work very well.
+
+But the stronger claim, “Claude is better than Spotify recommendations,” is not established here. Spotify’s production recommender likely uses richer signals, much larger data, and stronger retrieval/reranking stacks than the baselines in this study.
+
+Recommended next steps:
+- Evaluate on a real personal Spotify export rather than public proxies.
+- Compare against stronger public baselines such as SASRec, PureSVD, or RecBole models.
+- Separate candidate generation from LLM reranking.
+- Add human preference judgments on novelty, usefulness, and playlist fit.
+
+## References
+- Wu et al., *A Survey on Large Language Models for Recommendation* (2023)
+- Zhao et al., *Recommender Systems in the Era of Large Language Models* (2023)
+- Geng et al., *Recommendation as Language Processing* (2022)
+- Zhang et al., *Recommendation as Instruction Following* (2023)
+- Liao et al., *LLaRA* (2023)
+- Kim et al., *A-LLMRec* (2024)
+- Doh et al., *TALKPLAY* (2025)
+- Teinemaa et al., *Automatic Playlist Continuation through a Composition of Collaborative Filters* (2018)
+- Zamani et al., *An Analysis of Approaches Taken in the ACM RecSys Challenge 2018* (2018)
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Research Plan
+
+## Motivation &amp; Novelty Assessment
+
+### Why This Research Matters
+Users increasingly have access to rich personal listening-history exports, and current LLMs can reason over that history in natural language without any bespoke recommender training. If prompt-only LLM recommendation were competitive with strong Spotify-style ranking baselines, users could obtain high-quality recommendations from a model like Claude using only exported data and a text prompt rather than depending entirely on a platform recommender.
+
+### Gap in Existing Work
+The gathered literature shows that LLMs can help recommendation, but the strongest reported wins usually come from hybrid systems such as A-LLMRec, LLaRA, or TALKPLAY rather than from prompt-only recommendation over user history. Public evidence on music recommendation is thinner than for movies or e-commerce, and there is little direct evidence that a general-purpose LLM prompted with listening history can beat strong Spotify-like collaborative or playlist-continuation baselines.
+
+### Our Novel Contribution
+This study directly tests the user&#39;s practical question: given only exported listening/playlist history and no task-specific fine-tuning, can a frontier LLM produce better music recommendations than classical Spotify-style algorithms? The novelty is the controlled head-to-head comparison between prompt-only LLM ranking and classical ranking baselines on the same candidate sets across two public music tasks: sequential next-track prediction and playlist continuation.
+
+### Experiment Justification
+- Experiment 1: Last.fm next-track ranking. This tests the closest public analogue to a personal Spotify export by using chronological user listening histories.
+- Experiment 2: Spotify MPD playlist continuation. This tests a Spotify-native public benchmark setting where recommendation is based on playlist context rather than a live user session.
+- Experiment 3: Prompt ablation within the LLM condition. This tests whether richer profile summaries materially improve prompt-only recommendation quality over a minimal history-only prompt.
+
+## Research Question
+Can a prompt-only frontier LLM, given music listening or playlist history and a fixed candidate pool, generate recommendations that match or outperform classical Spotify-style recommendation baselines?
+
+## Background and Motivation
+Prior work in `literature_review.md` indicates that LLMs can add semantic reasoning and conversational flexibility to recommendation, but the strongest quantitative results usually come from hybrid systems that combine collaborative filtering or sequential models with LLM components. Music-specific evidence is limited, and the most relevant strong classical baselines still come from Spotify Million Playlist Dataset work and sequence-aware recommenders. This study fills the gap between narrative claims about &#34;asking Claude for recommendations&#34; and reproducible offline ranking evidence.
+
+## Hypothesis Decomposition
+- H1: Prompt-only LLM ranking can beat a non-personalized popularity baseline on music recommendation tasks.
+- H2: Prompt-only LLM ranking can match or beat a stronger personalized/co-occurrence Spotify-style baseline on at least one public task.
+- H3: A richer prompt containing a compact user profile and recent history will outperform a minimal history-only prompt.
+- H4: Even if the LLM underperforms on accuracy, it may produce less popularity-biased recommendations than classical baselines.
+
+Independent variables:
+- Recommendation method: popularity, co-occurrence/item-kNN-style baseline, LLM minimal prompt, LLM profile prompt.
+- Task type: Last.fm next-track ranking, Spotify MPD playlist continuation.
+
+Dependent variables:
+- Hit@10
+- NDCG@10
+- MRR
+- Mean candidate popularity rank
+- Catalog coverage / distinct recommended items
+
+Alternative explanations:
+- LLM failure may reflect missing metadata such as audio features, genres, or embeddings rather than a fundamental inability to recommend.
+- Candidate-set ranking may underestimate conversational value because the LLM is constrained to a closed pool.
+- Public datasets may differ from a real Spotify export in richness and temporal recency.
+
+## Proposed Methodology
+
+### Approach
+Use an offline candidate-ranking protocol so every method solves the same problem. For each example, construct a candidate set containing one ground-truth relevant track and multiple negatives. Classical baselines score the candidates numerically; LLMs receive the same candidate set plus history context and must rank the options. This avoids unfair open-ended generation and enables direct comparison with standard ranking metrics.
+
+### Experimental Steps
+1. Inspect and validate the local Last.fm subset and Spotify MPD sample.
+   Rationale: confirm schema, sample sizes, and whether both datasets support a consistent ranking protocol.
+2. Build evaluation examples.
+   Rationale: create held-out candidate-ranking tasks from user histories and playlists with reproducible negative sampling.
+3. Implement classical baselines.
+   Rationale: establish a floor and a stronger Spotify-style personalized baseline before invoking any LLM.
+4. Implement LLM ranking prompts and API harness.
+   Rationale: test the practical &#34;ask Claude with export data&#34; workflow using real model calls and cached responses.
+5. Run both tasks under identical candidate pools.
+   Rationale: produce apples-to-apples comparisons and prompt ablations.
+6. Perform statistical analysis and error analysis.
+   Rationale: determine whether any gains are reliable and understand where each method succeeds or fails.
+
+### Baselines
+- Popularity baseline: rank candidate items by training-set frequency.
+- Personalized co-occurrence baseline: score candidates by co-occurrence with history items and artist continuity, approximating a lightweight Spotify-style collaborative heuristic.
+- LLM minimal prompt: frontier LLM receives recent listening/playlist context and candidate list only.
+- LLM profile prompt: frontier LLM receives recent context plus compact profile statistics such as top artists and countries when available.
+
+### Evaluation Metrics
+- Hit@10: whether the true held-out item appears in the top 10.
+- NDCG@10: ranking quality with stronger weight on higher ranks.
+- MRR: reciprocal rank of the first relevant item; useful for single-target candidate ranking.
+- Mean popularity percentile of recommended top-10 items: proxy for popularity bias.
+- Coverage: number of unique items appearing in top-10 outputs across the test set.
+
+These metrics align with the literature review recommendations and support both accuracy and beyond-accuracy analysis.
+
+### Statistical Analysis Plan
+- Primary hypothesis test: paired Wilcoxon signed-rank tests on per-example reciprocal rank and NDCG differences because example-level metric distributions are typically non-normal.
+- Confidence intervals: bootstrap 95% confidence intervals over test examples for aggregate metrics.
+- Effect size: paired Cohen&#39;s d on per-example metric differences.
+- Multiple comparisons: Benjamini-Hochberg correction across primary pairwise comparisons within each dataset.
+- Significance level: alpha = 0.05.
+
+## Expected Outcomes
+Results that would support the strongest form of the hypothesis:
+- An LLM condition significantly exceeds the personalized baseline on NDCG@10 or MRR on at least one task.
+
+Results that would partially support the hypothesis:
+- The LLM beats popularity but not the personalized baseline, while offering lower popularity bias or better coverage.
+
+Results that would refute the practical claim:
+- The LLM fails to beat the personalized baseline on either task and only matches or barely beats popularity.
+
+## Timeline and Milestones
+1. Planning and dataset verification: 20-30 minutes.
+2. Implementation of evaluation pipeline and baselines: 45-60 minutes.
+3. API integration and prompt evaluation: 45-60 minutes.
+4. Analysis, figures, and write-up: 30-45 minutes.
+5. Validation and reproducibility check: 15-20 minutes.
+
+## Potential Challenges
+- The local Last.fm subset may be sparse for many users.
+  Mitigation: require minimum history length and cap examples per user.
+- The MPD sample is only one slice, not the full benchmark.
+  Mitigation: treat MPD as a small external-validity check and document the limitation.
+- LLM output may be malformed or omit candidates.
+  Mitigation: require JSON output, validate responses, and retry invalid generations with cached logging.
+- API cost or latency may become large.
+  Mitigation: use a bounded candidate set, cache all responses, and start with a smaller development subset before scaling.
+
+## Success Criteria
+- A reproducible pipeline exists under `src/` and saves results under `results/`.
+- At least one real frontier LLM is evaluated with actual API calls.
+- Both public music tasks are executed with the same ranking protocol.
+- REPORT.md contains actual numerical results, figures, and a clear answer to the user&#39;s question.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: How much do LLMs solve recommendation algorithms?
+
+## Review Scope
+
+### Research Question
+Can LLMs generate music recommendations from user listening history or playlist context that match or outperform classical Spotify-like recommenders?
+
+### Inclusion Criteria
+
+- Paper studies LLMs for recommendation, sequential recommendation, conversational recommendation, or music recommendation.
+- Paper provides methodological detail or code relevant to experimentation.
+- Paper is directly relevant to Spotify-style playlist/listening-history recommendation or strong enough to inform baseline design.
+
+### Exclusion Criteria
+
+- Purely general LLM papers without recommendation content.
+- Music papers without a recommendation component.
+- Non-public resources with no usable methodological detail.
+
+### Time Frame
+2018-2025, with emphasis on 2023-2025 LLM work and 2018 Spotify MPD baselines.
+
+### Sources
+
+- arXiv
+- Hugging Face datasets
+- GitHub repositories
+- ACM RecSys challenge materials
+
+## Search Log
+
+| Date | Query | Source | Notes |
+|------|-------|--------|-------|
+| 2026-05-05 | LLM recommendation systems music recommendation Spotify data | local `paper-finder` + manual fallback | Helper service stalled, so manual primary-source search was used |
+| 2026-05-05 | LLM recommendation survey / A-LLMRec / LLaRA / TalkPlay | arXiv | Gathered recent LLM4Rec papers |
+| 2026-05-05 | Spotify Million Playlist Dataset / Last.fm datasets | Hugging Face + official challenge pages | Gathered public music datasets |
+
+## Key Papers
+
+### A Survey on Large Language Models for Recommendation
+
+- Authors: Likang Wu et al.
+- Year: 2023
+- Source: arXiv 2305.19860
+- Key contribution: organizes LLM recommenders into discriminative and generative families.
+- Methodology: survey and taxonomy rather than a new model.
+- Datasets used: summarizes common datasets such as MovieLens, Amazon, LastFM.
+- Results: identifies prompting, fine-tuning, and representation-learning patterns.
+- Code available: yes, paper list repo referenced in the paper.
+- Relevance: useful map of the design space, but not evidence that LLMs alone beat mature recommenders.
+
+### Recommender Systems in the Era of Large Language Models (LLMs)
+
+- Authors: Zihuai Zhao et al.
+- Year: 2023
+- Source: arXiv 2307.02046
+- Key contribution: frames three paradigms for using LLMs in recommendation: pre-training, fine-tuning, and prompting.
+- Methodology: broad survey of recommendation-enhancement patterns.
+- Datasets used: overview paper, not one benchmark.
+- Results: argues LLMs add semantic understanding and reasoning, but data sparsity and evaluation remain open issues.
+- Code available: no central experimental repo.
+- Relevance: good high-level framing for a hybrid study rather than an LLM-only study.
+
+### Recommendation as Language Processing (P5)
+
+- Authors: Shijie Geng et al.
+- Year: 2022
+- Source: arXiv 2203.13366
+- Key contribution: converts recommendation tasks into text-to-text generation.
+- Methodology: unified prompt-and-predict framework over multiple recommendation tasks.
+- Datasets used: several recommendation benchmarks across tasks.
+- Results: showed that language-style reformulation can work before current instruction-tuned LLMs.
+- Code available: yes.
+- Relevance: foundational precursor for treating recommendation as generation.
+
+### Recommendation as Instruction Following
+
+- Authors: Junjie Zhang et al.
+- Year: 2023
+- Source: arXiv 2305.07001
+- Key contribution: instruction-tunes Flan-T5-XL with 39 recommendation templates and 252K generated instructions.
+- Methodology: natural-language instructions represent preference, context, and task type.
+- Datasets used: several real-world recommendation/search datasets.
+- Baselines: classical recommenders and GPT-3.5.
+- Results: reports wins over several strong baselines including GPT-3.5 on evaluation tasks.
+- Code available: paper reports open-source model path.
+- Relevance: strong evidence that task-specific instruction tuning helps, but it is not music-specific.
+
+### LLM-Rec: Personalized Recommendation via Prompting Large Language Models
+
+- Authors: Hanjia Lyu et al.
+- Year: 2023
+- Source: arXiv 2307.15780
+- Key contribution: uses LLM prompting to enrich item text and improve downstream recommendation.
+- Methodology: four prompting strategies for text enrichment; recommendation is still done by simpler downstream models.
+- Datasets used: text-rich recommendation benchmarks.
+- Results: LLM-enriched text improves quality and allows simple MLP models to compete with stronger content methods.
+- Code available: yes.
+- Relevance: useful for a Spotify study because it suggests LLMs may be more valuable as feature generators than as standalone recommenders.
+
+### LLaRA: Large Language-Recommendation Assistant
+
+- Authors: Jiayi Liao et al.
+- Year: 2023
+- Source: arXiv 2312.02445
+- Key contribution: aligns sequential recommender ID embeddings with LLM inputs using a projector and hybrid prompts.
+- Methodology: combines traditional recommender embeddings plus text; curriculum from text-only to hybrid prompts.
+- Datasets used: MovieLens, Steam, LastFM.
+- Results: repo reports best HitRatio@1 among its variants on LastFM with SASRec backbone.
+- Code available: yes, including LastFM scripts.
+- Relevance: directly useful because it already has a LastFM path and is closer to music recommendation than many generic LLM4Rec papers.
+
+### A-LLMRec
+
+- Authors: Sein Kim et al.
+- Year: 2024
+- Source: arXiv 2404.11343 / KDD 2024
+- Key contribution: injects collaborative knowledge from a frozen CF recommender into a frozen LLM in a two-stage alignment pipeline.
+- Methodology: Stage 1 aligns item embeddings with text via SBERT and MLPs; Stage 2 projects joint knowledge into the LLM.
+- Datasets used: Amazon categories in the public paper and repo.
+- Baselines: SASRec, MoRec, CTRL, RECFORMER, TALLRec, LLM-only variants.
+- Results: deep-read tables show strong Hit@1 gains in both cold and warm item settings over the listed baselines.
+- Code available: yes.
+- Relevance: the clearest evidence in this set that hybrid CF+LLM approaches outperform LLM-only approaches.
+
+### Large Language Models as Recommender Systems: A Study of Popularity Bias
+
+- Authors: Jan Malte Lichtenberg et al.
+- Year: 2024
+- Source: arXiv 2406.01285
+- Key contribution: evaluates LLM-based recommendation through the lens of popularity bias.
+- Methodology: compares a simple LLM recommender against traditional methods on a movie task and proposes a bias metric.
+- Datasets used: movie recommendation data.
+- Results: LLM recommender shows less popularity bias in that setup.
+- Code available: not identified in this pass.
+- Relevance: important warning that better recommendation is not only accuracy; novelty and bias matter, especially for music.
+
+### TALKPLAY: Multimodal Music Recommendation with Large Language Models
+
+- Authors: Seungheon Doh, Keunwoo Choi, Juhan Nam
+- Year: 2025
+- Source: arXiv 2502.13713
+- Key contribution: reframes conversational music recommendation as token generation over a combined text-plus-music vocabulary.
+- Methodology: multimodal music tokenizer over audio, lyrics, metadata, semantic tags, and playlist co-occurrence; supervised fine-tuning of an LLM; generation of music tokens before natural-language response.
+- Datasets used: synthetic music recommendation conversations and multimodal music metadata.
+- Baselines: BM25, CLAP-Music, NV-Embed-V2, SASRec, TIGER.
+- Results: deep-read Table 2 shows TALKPLAY best overall, with MRR 0.049, Hit@1 0.026, Hit@100 0.288, and major gains over the strongest baseline in Hit@1.
+- Code available: demo available; code availability not clearly resolved from the PDF chunk pass.
+- Relevance: the strongest direct evidence gathered here for LLM-based music recommendation.
+
+### Spotify MPD Baseline Papers
+
+- 2018 challenge papers show what a strong non-LLM baseline looks like for Spotify-style music recommendation.
+- `Automatic Playlist Continuation through a Composition of Collaborative Filters` combines playlist-title, artist, album, and track collaborative filters and reached 12th/112 on the challenge leaderboard.
+- `An Analysis of Approaches Taken in the ACM RecSys Challenge 2018` reports best main-track metrics around R-precision 0.2241 and NDCG 0.3946 and shows how strong hybrid or neighborhood-style methods can be.
+- Relevance: these are the baseline floor that an LLM system must beat on Spotify-like public data.
+
+## Common Methodologies
+
+- LLM as generator: P5, instruction-following recommendation, TALKPLAY.
+- LLM as semantic augmenter: LLM-Rec.
+- Hybrid recommender + LLM alignment: LLaRA and A-LLMRec.
+- Classical music baselines: collaborative filtering, neighborhood models, PureSVD, track2vec, SASRec.
+
+## Standard Baselines
+
+- Popularity baseline: easy but weak; still essential.
+- Item-kNN / user-kNN / neighborhood methods: strong classical baselines on playlist continuation.
+- PureSVD / matrix factorization: compact collaborative baseline.
+- SASRec or GRU4Rec: standard sequential neural baselines.
+- BM25 / dense retrieval: useful when recommendation is driven by explicit natural-language music queries.
+
+## Evaluation Metrics
+
+- Ranking quality: Hit@K, Recall@K, NDCG@K, MRR.
+- Playlist continuation metrics: R-precision, NDCG, clicks.
+- Beyond accuracy: popularity bias, novelty, diversity, and conversational response quality.
+
+## Datasets in the Literature
+
+- Spotify Million Playlist Dataset: standard public benchmark for playlist continuation.
+- LastFM: useful for sequential music recommendation and user listening histories.
+- Amazon / MovieLens / Steam: common in LLM4Rec papers but weaker domain match for this hypothesis.
+
+## Gaps and Opportunities
+
+- Most LLM4Rec papers are not music-specific.
+- Many strong LLM results are hybrid, not pure LLM-only systems.
+- Public evidence against strong Spotify-style baselines is still limited.
+- Personal Spotify export data is the best domain match but raises evaluation and candidate-set design issues.
+
+## Recommendations for Our Experiment
+
+- Recommended datasets: full `lastfm-1k` or `lastfm-360k` for rapid prototyping; Spotify MPD for public Spotify-like evaluation; personal Spotify export for final hypothesis testing.
+- Recommended baselines: popularity, item-kNN, PureSVD, SASRec/GRU4Rec, and a non-LLM retrieval baseline such as BM25 when using textual prompts.
+- Recommended metrics: Hit@10, Recall@10, NDCG@10, MRR, novelty/diversity, and popularity-bias metrics.
+- Methodological considerations:
+  - Do not compare an unconstrained LLM against Spotify recommendations without fixing the candidate set.
+  - Test hybrid systems, not just pure prompting.
+  - Use the same held-out next-track or held-out playlist-completion protocol for all methods.
+  - Separate &#34;recommendation quality&#34; from &#34;response quality&#34;; TALKPLAY suggests these can be optimized together, but many baselines cannot.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. AUTHOR
+   - Use this exact author line in the \author{} block: Ari Holtzman and NeuriCo
+
+3. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+4. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+5. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+6. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+7. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+8. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+9. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+10. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   \author{Ari Holtzman and NeuriCo}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Command templates are pre-copied to paper_draft/commands/:
+   - math.tex: Math notation macros
+   - general.tex: Formatting macros
+   - macros.tex: Project-specific term definitions (customize this for your paper)
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read .codex/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.

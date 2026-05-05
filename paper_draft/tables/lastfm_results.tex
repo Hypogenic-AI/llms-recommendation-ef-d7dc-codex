@@ -1,0 +1,19 @@
+\begin{table}[t]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}lcccc@{}}
+        \toprule
+        \textbf{Method} & \textbf{MRR} & \textbf{NDCG@10} & \textbf{Hit@10} & \textbf{Mean Top-10 Popularity Pct} \\
+        \midrule
+        Popularity & 0.051 & 0.000 & 0.000 & 0.0001 \\
+        Cooccurrence & 0.282 & 0.246 & 0.260 & 0.0100 \\
+        \gptfourone (\minimalprompt) & {\bf 0.589} & {\bf 0.621} & {\bf 0.780} & 0.0388 \\
+        \gptfourone (\profileprompt) & 0.539 & 0.581 & {\bf 0.780} & {\bf 0.0398} \\
+        \claudesonnet (\minimalprompt) & 0.572 & 0.597 & 0.740 & 0.0361 \\
+        \claudesonnet (\profileprompt) & 0.544 & 0.586 & {\bf 0.780} & 0.0397 \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Results on \lastfm next-track ranking. Higher is better for all metrics shown. Best results are in \textbf{bold}.}
+    \label{tab:lastfm-results}
+\end{table}

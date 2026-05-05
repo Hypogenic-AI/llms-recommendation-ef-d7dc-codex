@@ -1,0 +1,22 @@
+\section{Introduction}
+\label{sec:intro}
+
+Users can now export years of listening history from streaming platforms and hand that history directly to a general-purpose language model. That creates a simple question with real practical stakes: if we ask a frontier LLM for music recommendations from exported data, do we get recommendations that are as good as platform-style recommenders?
+
+This question matters because prompt-only recommendation changes who controls the interface. Instead of relying entirely on a platform recommender, users could carry their history across systems and request recommendations in natural language. If prompting alone works well, recommendation becomes more portable, inspectable, and user-directed.
+
+Existing work suggests that LLMs can help recommendation, but most strong results come from hybrid systems rather than pure prompting. Survey papers map a broad design space for LLM-enhanced recommendation, including prompting, instruction tuning, and hybrid pipelines \cite{wu2023survey,zhao2023era}. Foundational work such as P5 and instruction-following recommendation reformulates recommendation as language processing \cite{geng2022p5,zhang2023instruction}. More recent systems such as \textsc{LLaRA}, \textsc{A-LLMRec}, and \textsc{TalkPlay} combine LLMs with sequential recommenders, collaborative filtering, or multimodal music representations \cite{liao2024llara,kim2024allmrec,doh2025talkplay}. What remains less clear is the narrower setting that many users actually care about: no fine-tuning, no learned retriever, and no private platform signals, only prompting over listening history.
+
+We examine exactly that setting. We cast recommendation as closed-set ranking and compare prompt-only frontier LLMs against lightweight classical baselines on two public music tasks: \lastfm next-track prediction and \mpd playlist continuation. Every method sees the same 20-item candidate set, with one held-out positive and 19 negatives. This setup avoids an unfair comparison between unconstrained generation and numerical ranking while preserving the central question of whether the model can identify the right continuation from context alone. \Figref{fig:pipeline} summarizes the evaluation protocol.
+
+The main quantitative result is simple. On \lastfm, \gptfourone with the \minimalprompt prompt reaches 0.589 \mrr and 0.621 \ndcg, compared with 0.282 and 0.246 for the strongest classical baseline. On \mpd, the same setup reaches 0.329 \mrr and 0.379 \ndcg, compared with 0.094 and 0.061. \claudesonnet is statistically tied with \gptfourone in the same prompt condition, and richer profile prompts do not improve results.
+
+\para{Our contributions are:}
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We provide a controlled head-to-head evaluation of prompt-only frontier LLMs against lightweight Spotify-style baselines on two public music recommendation tasks.
+    \item We show that the strongest prompt-only condition significantly outperforms both a popularity baseline and a personalized cooccurrence baseline on \lastfm and \mpd.
+    \item We conduct prompt ablations and statistical tests that show a simple recent-context prompt is as good as or better than a richer profile prompt.
+    \item We clarify the boundary of the practical claim: these results support prompt-only recommendation against lightweight public baselines, not against Spotify's proprietary production recommender.
+\end{itemize}
+
+The rest of the paper is organized as follows. \Secref{sec:related} reviews prior work on LLM-based and music-specific recommendation. \Secref{sec:method} describes the evaluation setup, baselines, and statistical plan. \Secref{sec:results} reports main results and ablations. \Secref{sec:discussion} discusses interpretation, limitations, and implications.

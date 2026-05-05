@@ -1,0 +1,43 @@
+\section{Methodology}
+\label{sec:method}
+
+\para{Task formulation.} Each evaluation example consists of context $h$, a candidate set $C=\{c_1,\dots,c_{20}\}$, and one relevant held-out target $y \in C$. The context is either a recent listening history (\lastfm) or a playlist prefix (\mpd). Methods must rank the 20 candidates, and we score the induced ranking by \mrr, \ndcg, and \hitten. This closed-set protocol ensures that LLMs and classical baselines solve the same problem.
+
+\begin{figure}[t]
+    \centering
+    \fbox{%
+    \parbox{0.95\linewidth}{%
+    \centering
+    \textbf{History or playlist prefix} $\rightarrow$ \textbf{20-item candidate pool} $\rightarrow$ \textbf{method-specific ranking} $\rightarrow$ \textbf{offline metrics}\\[3pt]
+    \small
+    One ground-truth continuation and 19 negatives are shared across all methods. LLMs receive the same candidate pool as the classical baselines and return an ordered ranking.
+    }}
+    \caption{Evaluation pipeline. We test prompt-only recommendation as candidate ranking, not open-ended generation, so every method is compared on the same decision problem.}
+    \label{fig:pipeline}
+\end{figure}
+
+\subsection{Datasets and Example Construction}
+
+\para{\lastfm next-track ranking.} The local pre-gathered subset contained only seven users, so we loaded a larger Hugging Face slice, `train[:1000000]`, which yielded 56 users and 55 eligible users. We sampled 50 held-out next-track examples. Each example uses recent chronological listening history as context, one true next track as the positive item, and 19 negatives.
+
+\para{\mpd playlist continuation.} We used a downloaded slice of 1000 playlists from the Spotify Million Playlist Dataset and constructed 50 held-out continuation examples. Each example uses a playlist prefix as context and the same 1-positive, 19-negative candidate structure as \lastfm.
+
+\para{Why closed-set ranking?} The user-facing question is often framed as open-ended recommendation, but direct comparison is otherwise ill-posed. A free-form LLM could generate items outside the baseline candidate pool, while a classical heuristic typically scores a fixed list. We therefore use shared candidate sets for all methods.
+
+\subsection{Methods}
+
+\para{Classical baselines.} We implement two lightweight baselines. \popbaseline ranks candidates by training frequency. \coocbaseline scores each candidate with a combination of track cooccurrence, artist cooccurrence, and a small popularity term. This is intended as a lightweight Spotify-style heuristic, not a reproduction of Spotify's production stack.
+
+\para{Prompt-only LLM conditions.} We evaluate \gptfourone through the OpenAI Responses API and \claudesonnet through OpenRouter, both at temperature 0.0. We test two prompts. The \minimalprompt prompt includes only recent listening or playlist context plus the candidate list. The \profileprompt prompt adds compact profile hints such as top artists and country when available.
+
+\subsection{Metrics and Statistical Analysis}
+
+\para{Ranking metrics.} Our primary metrics are \mrr and \ndcg, which are well suited to single-target candidate ranking. We also report \hitten. For beyond-accuracy analysis, we report \meanpoppct, where larger values indicate that recommendations are less concentrated in the global popularity head, and coverage, defined as the fraction of unique catalog items appearing in top-10 recommendation lists across the test set.
+
+\para{Statistical tests.} We run paired Wilcoxon signed-rank tests on per-example \mrr and \ndcg differences and apply Benjamini-Hochberg correction across primary comparisons within each dataset. We report paired Cohen's $d$ on per-example differences and bootstrap 95\% confidence intervals for aggregate metrics.
+
+\subsection{Environment and Cost}
+
+\para{Execution environment.} Experiments were run on May 5, 2026 with Python 3.12.8 and standard scientific Python libraries, including NumPy 2.4.4, pandas 3.0.2, SciPy 1.17.1, matplotlib 3.10.9, seaborn 0.13.2, datasets 4.8.5, and requests 2.33.1. The machine exposed four NVIDIA RTX A6000 GPUs, but the evaluation was API-bound and did not use local GPU inference.
+
+\para{API cost.} The final run used 84,195 OpenAI input tokens and 23,014 output tokens, for an estimated OpenAI cost of about \$0.353 using the official \gptfourone API pricing page. Claude usage totaled 123,526 tokens with reported API cost of \$0.606. Total estimated cost was about \$0.958.

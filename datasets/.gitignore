@@ -1,0 +1,6 @@
+# Exclude downloaded datasets and derived artifacts from git.
+*
+
+# Keep documentation.
+!.gitignore
+!README.md
